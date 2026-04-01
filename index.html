@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Code Visualizer Pro</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <!-- Animated grid background -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <!-- ── Navbar ── -->
+    <nav class="navbar">
+      <div class="logo">
+        <i class="fa-solid fa-code"></i>
+        <span>Code<strong>Viz</strong></span>
+      </div>
+      <div class="nav-center">
+        <span class="nav-tag">C++ Visualizer</span>
+      </div>
+      <div class="nav-links">
+        <span><i class="fa fa-book"></i> Docs</span>
+        <span><i class="fa fa-circle-question"></i> Help</span>
+      </div>
+    </nav>
+
+    <!-- ── Hero ── -->
+    <section class="hero">
+      <div class="hero-content">
+        <h1>Step Through Your <span class="grad-text">C++ Code</span></h1>
+        <p>Watch variables change, loops iterate, and logic flow — one step at a time.</p>
+        <div class="hero-chips">
+          <span class="chip"><i class="fa fa-check"></i> int / float / double / bool / char</span>
+          <span class="chip"><i class="fa fa-check"></i> for / while / if-else</span>
+          <span class="chip"><i class="fa fa-check"></i> cout output</span>
+          <span class="chip"><i class="fa fa-check"></i> Runtime error detection</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Main Workspace ── -->
+    <div class="workspace">
+
+      <!-- 1. Code Editor -->
+      <div class="panel p-editor">
+        <div class="panel-header">
+          <span><i class="fa fa-terminal"></i> Code Editor</span>
+          <span class="hint-tag">C++</span>
+        </div>
+        <div id="editor"></div>
+      </div>
+
+      <!-- 2. Execution Flow -->
+      <div class="panel p-flow">
+        <div class="panel-header">
+          <span><i class="fa fa-arrow-right-to-bracket"></i> Execution Flow</span>
+          <span id="stepInfo" class="step-badge">Idle</span>
+        </div>
+        <div id="codeView"></div>
+      </div>
+
+      <!-- 3. Variables -->
+      <div class="panel p-vars">
+        <div class="panel-header">
+          <span><i class="fa fa-microchip"></i> Memory</span>
+          <span class="hint-tag" id="varCount">0 vars</span>
+        </div>
+        <div id="varView"></div>
+      </div>
+
+      <!-- 4. Console Output -->
+      <div class="panel p-console">
+        <div class="panel-header">
+          <span><i class="fa fa-rectangle-terminal"></i> Console Output</span>
+        </div>
+        <div id="consoleOut"></div>
+      </div>
+
+      <!-- 5. Diagnostics -->
+      <div class="panel p-errors">
+        <div class="panel-header">
+          <span><i class="fa fa-bug"></i> Diagnostics</span>
+        </div>
+        <div id="errorView"><span class="no-err">✓ No errors detected</span></div>
+      </div>
+
+    </div>
+
+    <!-- ── Controls ── -->
+    <div class="controls-bar">
+      <button class="ctrl-btn" onclick="step()" title="Step">
+        <i class="fa fa-forward-step"></i><span>Step</span>
+      </button>
+
+      <button class="ctrl-btn btn-run" id="runBtn" onclick="run()" title="Run / Pause">
+        <i class="fa fa-play"></i><span>Run</span>
+      </button>
+
+      <button class="ctrl-btn" onclick="pause()" title="Pause">
+        <i class="fa fa-pause"></i><span>Pause</span>
+      </button>
+
+      <button class="ctrl-btn btn-reset" onclick="reset()" title="Reset">
+        <i class="fa fa-rotate"></i><span>Reset</span>
+      </button>
+
+      <div class="speed-box">
+        <label><i class="fa fa-gauge-high"></i> Speed</label>
+        <input type="range" id="speedSlider" min="200" max="2000" step="100" value="1000" />
+        <span class="speed-hint">Fast</span>
+      </div>
+    </div>
+
+    <footer>
+      <span>© 2026 Code Visualizer Pro</span>
+      <span class="foot-sep">·</span>
+      <span>Built by Parth, Vedant &amp; Soumyajit</span>
+    </footer>
+
+    <!-- Monaco Loader -->
+    <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+    <script>
+      require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' } });
+
+      require(['vs/editor/editor.main'], function () {
+        window.editor = monaco.editor.create(document.getElementById('editor'), {
+          value: `#include <iostream>
+using namespace std;
+
+int main() {
+    int sum = 0;
+    int n = 5;
+
+    for (int i = 1; i <= n; i++) {
+        sum += i;
+        cout << "i=" << i << " sum=" << sum << endl;
+    }
+
+    bool isEven = (sum % 2 == 0);
+    cout << "Final sum: " << sum << endl;
+
+    return 0;
+}`,
+          language: 'cpp',
+          theme: 'vs-dark',
+          automaticLayout: true,
+          fontSize: 13,
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false,
+        });
+
+        initVisualizer();
+      });
+    </script>
+
+    <script src="script.js"></script>
+
+
+  </body>
+</html>

@@ -7,20 +7,20 @@
    ============================================================ */
 
 let instructions = [];     // compiled instruction tape
-let ip            = 0;     // instruction pointer
-let memory        = {};    // { name: { type, value, changed } }
+let ip = 0;     // instruction pointer
+let memory = {};    // { name: { type, value, changed } }
 let consoleOutput = [];
 let runtimeErrors = [];
-let parseErrors   = [];
-let currentLine   = -1;
-let intervalId    = null;
-let isFinished    = false;
+let parseErrors = [];
+let currentLine = -1;
+let intervalId = null;
+let isFinished = false;
 
 /* ─────────────────── TYPE UTILITIES ─────────────────── */
 
-const NUMERIC_TYPES = ['int','long','short','unsigned'];
-const FLOAT_TYPES   = ['float','double'];
-const ALL_TYPES     = [...NUMERIC_TYPES, ...FLOAT_TYPES, 'bool','char'];
+const NUMERIC_TYPES = ['int', 'long', 'short', 'unsigned'];
+const FLOAT_TYPES = ['float', 'double'];
+const ALL_TYPES = [...NUMERIC_TYPES, ...FLOAT_TYPES, 'bool', 'char'];
 
 function defaultFor(type) {
     if (type === 'bool') return 'false';
@@ -31,8 +31,8 @@ function defaultFor(type) {
 function coerce(val, type) {
     if (val === undefined || val === null) return 0;
     if (NUMERIC_TYPES.includes(type)) return Math.trunc(Number(val));
-    if (FLOAT_TYPES.includes(type))   return parseFloat(Number(val).toPrecision(7));
-    if (type === 'bool')  return Boolean(val);
+    if (FLOAT_TYPES.includes(type)) return parseFloat(Number(val).toPrecision(7));
+    if (type === 'bool') return Boolean(val);
     if (type === 'char') {
         if (typeof val === 'string') return val.charAt(0) || '\0';
         return String.fromCharCode(Math.trunc(Number(val)));
@@ -81,7 +81,7 @@ function evalExpr(expr) {
 
     // Check for remaining unknown identifiers
     const ids = (e.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || []);
-    const safe = new Set(['true','false','null','undefined','NaN','Infinity','endl','Math']);
+    const safe = new Set(['true', 'false', 'null', 'undefined', 'NaN', 'Infinity', 'endl', 'Math']);
     for (const id of ids) {
         if (!safe.has(id) && isNaN(Number(id))) {
             throw new Error(`Undefined variable: '${id}'`);
@@ -123,7 +123,7 @@ function findMatchingClose(lines, openLine) {
 
 function compile() {
     instructions = [];
-    parseErrors   = [];
+    parseErrors = [];
 
     const lines = editor.getValue().split('\n');
     try {
@@ -145,7 +145,7 @@ function compileRange(lines, from, to) {
 const TYPE_RE = new RegExp(`^(${ALL_TYPES.join('|')})\\s`);
 
 function compileSingle(lines, i, max) {
-    const raw  = lines[i] || '';
+    const raw = lines[i] || '';
     const line = raw.trim();
 
     // ── Skippable lines ──────────────────────────────────────
@@ -177,10 +177,10 @@ function compileSingle(lines, i, max) {
     }
 
     // ── Control structures ────────────────────────────────────
-    if (/^for\s*\(/.test(line))   return compileFor(lines, i, max);
+    if (/^for\s*\(/.test(line)) return compileFor(lines, i, max);
     if (/^while\s*\(/.test(line)) return compileWhile(lines, i, max);
-    if (/^if\s*\(/.test(line))    return compileIf(lines, i, max);
-    if (/^do\s*\{?/.test(line))   return compileDo(lines, i, max);
+    if (/^if\s*\(/.test(line)) return compileIf(lines, i, max);
+    if (/^do\s*\{?/.test(line)) return compileDo(lines, i, max);
 
     // Orphan else (shouldn't appear under normal parsing)
     if (/^else/.test(line)) { instructions.push({ type: 'noop', line: i }); return i + 1; }
@@ -195,8 +195,8 @@ function compileSingle(lines, i, max) {
     // ── Increment / Decrement ─────────────────────────────────
     const post = line.match(/^(\w+)\s*(\+\+|--)\s*;\s*$/);
     if (post) { instructions.push({ type: 'incrdecr', line: i, varName: post[1], op: post[2] }); return i + 1; }
-    const pre  = line.match(/^(\+\+|--)\s*(\w+)\s*;\s*$/);
-    if (pre)  { instructions.push({ type: 'incrdecr', line: i, varName: pre[2],  op: pre[1]  }); return i + 1; }
+    const pre = line.match(/^(\+\+|--)\s*(\w+)\s*;\s*$/);
+    if (pre) { instructions.push({ type: 'incrdecr', line: i, varName: pre[2], op: pre[1] }); return i + 1; }
 
     // ── Compound assignment: x += expr ───────────────────────
     const comp = line.match(/^(\w+)\s*(\+=|-=|\*=|\/=|%=)\s*(.+?)\s*;\s*$/);
@@ -221,9 +221,9 @@ function compileFor(lines, i) {
     const line = lines[i].trim();
 
     /* Support: for(type v=init; cond; update) or for(v=init; cond; update) */
-    const fm = line.match(/^for\s*\(\s*(.+?);\s*(.+?);\s*(.+?)\s*\)\s*\{?/);
+    const fm = line.match(/^for\s*\(\s*(.*?);\s*(.*?);\s*(.*?)\s*\)\s*\{?/);
     if (!fm) {
-        parseErrors.push(`Line ${i+1}: Malformed for-loop header`);
+        parseErrors.push(`Line ${i + 1}: Malformed for-loop header`);
         instructions.push({ type: 'noop', line: i });
         return i + 1;
     }
@@ -241,10 +241,11 @@ function compileFor(lines, i) {
 
     // Condition jump
     const condIdx = instructions.length;
-    instructions.push({ type: 'jif0', line: i, expr: condPart, target: -1 });
+    const condExpr = condPart.trim() === '' ? '1' : condPart;
+    instructions.push({ type: 'jif0', line: i, expr: condExpr, target: -1 });
 
     // Body
-    const bOpen  = findBlockOpen(lines, i);
+    const bOpen = findBlockOpen(lines, i);
     const bClose = findMatchingClose(lines, bOpen);
     compileRange(lines, bOpen + 1, bClose - 1);
 
@@ -266,14 +267,14 @@ function compileWhile(lines, i) {
     const line = lines[i].trim();
     const wm = line.match(/^while\s*\(\s*(.+?)\s*\)\s*\{?/);
     if (!wm) {
-        parseErrors.push(`Line ${i+1}: Malformed while-loop header`);
+        parseErrors.push(`Line ${i + 1}: Malformed while-loop header`);
         instructions.push({ type: 'noop', line: i });
         return i + 1;
     }
 
     const condPart = wm[1];
-    const bOpen    = findBlockOpen(lines, i);
-    const bClose   = findMatchingClose(lines, bOpen);
+    const bOpen = findBlockOpen(lines, i);
+    const bClose = findMatchingClose(lines, bOpen);
 
     const condIdx = instructions.length;
     instructions.push({ type: 'jif0', line: i, expr: condPart, target: -1 });
@@ -289,7 +290,7 @@ function compileWhile(lines, i) {
 
 /* ── Do-While ─────────────────────────────────────────────── */
 function compileDo(lines, i) {
-    const bOpen  = findBlockOpen(lines, i);
+    const bOpen = findBlockOpen(lines, i);
     const bClose = findMatchingClose(lines, bOpen);
 
     const bodyStart = instructions.length;
@@ -312,21 +313,21 @@ function compileIf(lines, i) {
     const line = lines[i].trim();
     const im = line.match(/^if\s*\(\s*(.+?)\s*\)\s*\{?/);
     if (!im) {
-        parseErrors.push(`Line ${i+1}: Malformed if-statement`);
+        parseErrors.push(`Line ${i + 1}: Malformed if-statement`);
         instructions.push({ type: 'noop', line: i });
         return i + 1;
     }
 
     const condPart = im[1];
-    const bOpen    = findBlockOpen(lines, i);
-    const bClose   = findMatchingClose(lines, bOpen);
+    const bOpen = findBlockOpen(lines, i);
+    const bClose = findMatchingClose(lines, bOpen);
 
     const condIdx = instructions.length;
     instructions.push({ type: 'jif0', line: i, expr: condPart, target: -1 });
 
     compileRange(lines, bOpen + 1, bClose - 1);
 
-    const next    = bClose + 1;
+    const next = bClose + 1;
     const nextTxt = (next < lines.length ? lines[next] : '').trim();
 
     if (nextTxt.startsWith('else')) {
@@ -339,7 +340,7 @@ function compileIf(lines, i) {
             instructions[elseJump].target = instructions.length;
             return after;
         } else {
-            const eOpen  = findBlockOpen(lines, next);
+            const eOpen = findBlockOpen(lines, next);
             const eClose = findMatchingClose(lines, eOpen);
             compileRange(lines, eOpen + 1, eClose - 1);
             instructions[elseJump].target = instructions.length;
@@ -356,14 +357,14 @@ function compileIf(lines, i) {
 /* ── Emit update expression (for-loop) ───────────────────── */
 function emitUpdate(part, line) {
     const post = part.match(/^(\w+)\s*(\+\+|--)$/);
-    const pre  = part.match(/^(\+\+|--)\s*(\w+)$/);
+    const pre = part.match(/^(\+\+|--)\s*(\w+)$/);
     const comp = part.match(/^(\w+)\s*(\+=|-=|\*=|\/=)\s*(.+)$/);
     const asgn = part.match(/^(\w+)\s*=\s*(.+)$/);
 
-    if      (post) instructions.push({ type: 'incrdecr', line, varName: post[1], op: post[2] });
-    else if (pre)  instructions.push({ type: 'incrdecr', line, varName: pre[2],  op: pre[1]  });
+    if (post) instructions.push({ type: 'incrdecr', line, varName: post[1], op: post[2] });
+    else if (pre) instructions.push({ type: 'incrdecr', line, varName: pre[2], op: pre[1] });
     else if (comp) instructions.push({ type: 'compound', line, varName: comp[1], op: comp[2], expr: comp[3] });
-    else if (asgn) instructions.push({ type: 'assign',   line, varName: asgn[1], expr: asgn[2] });
+    else if (asgn) instructions.push({ type: 'assign', line, varName: asgn[1], expr: asgn[2] });
 }
 
 /* ─────────────────── EXECUTION ENGINE ─────────────────── */
@@ -402,7 +403,7 @@ function execStep() {
             case 'assign': {
                 if (!(ins.varName in memory)) throw new Error(`Assignment to undeclared variable '${ins.varName}'`);
                 const val = evalExpr(ins.expr);
-                memory[ins.varName].value   = coerce(val, memory[ins.varName].type);
+                memory[ins.varName].value = coerce(val, memory[ins.varName].type);
                 memory[ins.varName].changed = true;
                 ip++;
                 break;
@@ -412,15 +413,15 @@ function execStep() {
                 if (!(ins.varName in memory)) throw new Error(`Undeclared variable '${ins.varName}'`);
                 const rhs = evalExpr(ins.expr);
                 const cur = memory[ins.varName].value;
-                const t   = memory[ins.varName].type;
+                const t = memory[ins.varName].type;
                 let nv;
-                if      (ins.op === '+=') nv = cur + rhs;
+                if (ins.op === '+=') nv = cur + rhs;
                 else if (ins.op === '-=') nv = cur - rhs;
                 else if (ins.op === '*=') nv = cur * rhs;
                 else if (ins.op === '/=') { if (rhs === 0) throw new Error('Division by zero'); nv = cur / rhs; }
-                else if (ins.op === '%=') { if (rhs === 0) throw new Error('Modulo by zero');    nv = cur % rhs; }
+                else if (ins.op === '%=') { if (rhs === 0) throw new Error('Modulo by zero'); nv = cur % rhs; }
                 else nv = cur;
-                memory[ins.varName].value   = coerce(nv, t);
+                memory[ins.varName].value = coerce(nv, t);
                 memory[ins.varName].changed = true;
                 ip++;
                 break;
@@ -428,9 +429,9 @@ function execStep() {
 
             case 'incrdecr': {
                 if (!(ins.varName in memory)) throw new Error(`Undeclared variable '${ins.varName}'`);
-                const t  = memory[ins.varName].type;
+                const t = memory[ins.varName].type;
                 const cv = memory[ins.varName].value;
-                memory[ins.varName].value   = coerce(ins.op === '++' ? cv + 1 : cv - 1, t);
+                memory[ins.varName].value = coerce(ins.op === '++' ? cv + 1 : cv - 1, t);
                 memory[ins.varName].changed = true;
                 ip++;
                 break;
@@ -453,8 +454,8 @@ function execStep() {
                 break;
 
             case 'cout': {
-                const parts  = ins.expr.split('<<').map(p => p.trim()).filter(Boolean);
-                let   output = '';
+                const parts = ins.expr.split('<<').map(p => p.trim()).filter(Boolean);
+                let output = '';
                 for (const p of parts) {
                     if (p === 'endl' || p === 'std::endl' || p === '"\\n"' || p === "'\\n'") continue;
                     output += String(evalExpr(p));
@@ -489,7 +490,7 @@ function render() {
 
 function renderCode() {
     const lines = editor.getValue().split('\n');
-    const view  = document.getElementById('codeView');
+    const view = document.getElementById('codeView');
     view.innerHTML = '';
 
     lines.forEach((text, idx) => {
@@ -498,7 +499,7 @@ function renderCode() {
 
         const hasErr = runtimeErrors.some(e => e.line === idx);
         if (idx === currentLine && !hasErr) div.classList.add('active');
-        if (hasErr)                         div.classList.add('err-line');
+        if (hasErr) div.classList.add('err-line');
 
         div.innerHTML = `<span class="ln">${idx + 1}</span><span class="lc">${escHtml(text)}</span>`;
         view.appendChild(div);
@@ -523,7 +524,7 @@ function renderVars() {
     }
 
     for (const name of keys) {
-        const v   = memory[name];
+        const v = memory[name];
         const div = document.createElement('div');
         div.className = 'v-row' + (v.changed ? ' v-changed' : '');
 
@@ -560,7 +561,7 @@ function renderErrors() {
     if (!view) return;
 
     const all = [
-        ...parseErrors.map(m => ({ line: -1, msg: m,     cls: 'pe' })),
+        ...parseErrors.map(m => ({ line: -1, msg: m, cls: 'pe' })),
         ...runtimeErrors.map(e => ({ line: e.line, msg: e.msg, cls: 're' }))
     ];
 
@@ -582,14 +583,14 @@ function renderStatus() {
     const el = document.getElementById('stepInfo');
     if (!el) return;
 
-    const meaningful = instructions.filter(i => !['noop','jump'].includes(i.type)).length;
+    const meaningful = instructions.filter(i => !['noop', 'jump'].includes(i.type)).length;
 
     if (isFinished) {
-        el.textContent  = runtimeErrors.length ? '⚠ Stopped' : '✓ Done';
-        el.className    = 'step-badge ' + (runtimeErrors.length ? 'sb-err' : 'sb-done');
+        el.textContent = runtimeErrors.length ? '⚠ Stopped' : '✓ Done';
+        el.className = 'step-badge ' + (runtimeErrors.length ? 'sb-err' : 'sb-done');
     } else {
-        el.textContent  = `Step ${ip} / ${instructions.length - 1}`;
-        el.className    = 'step-badge sb-run';
+        el.textContent = `Step ${ip} / ${instructions.length - 1}`;
+        el.className = 'step-badge sb-run';
     }
     /* update run-button appearance */
     const runBtn = document.getElementById('runBtn');
@@ -598,9 +599,9 @@ function renderStatus() {
 
 function escHtml(str) {
     return str
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 /* ─────────────────── CONTROLS ─────────────────── */
@@ -613,7 +614,7 @@ function run() {
     if (intervalId !== null) { pause(); return; }
     if (isFinished) return;
 
-    const sv    = parseInt(document.getElementById('speedSlider').value);
+    const sv = parseInt(document.getElementById('speedSlider').value);
     const delay = Math.round(2100 - sv);   // higher slider → faster
 
     intervalId = setInterval(() => {
@@ -630,12 +631,12 @@ function pause() {
 
 function reset() {
     pause();
-    ip            = 0;
-    memory        = {};
+    ip = 0;
+    memory = {};
     consoleOutput = [];
     runtimeErrors = [];
-    currentLine   = -1;
-    isFinished    = false;
+    currentLine = -1;
+    isFinished = false;
 
     compile();
     render();
@@ -681,15 +682,15 @@ function getCurrentUser() {
 }
 
 function updateUserUI() {
-    const user    = getCurrentUser();
+    const user = getCurrentUser();
     const loginBtn = document.getElementById('loginBtn');
     const userChip = document.getElementById('userChip');
-    const display  = document.getElementById('userNameDisplay');
+    const display = document.getElementById('userNameDisplay');
 
     if (user) {
         loginBtn && (loginBtn.style.display = 'none');
         userChip && (userChip.style.display = 'flex');
-        display  && (display.textContent    = user);
+        display && (display.textContent = user);
     } else {
         loginBtn && (loginBtn.style.display = 'flex');
         userChip && (userChip.style.display = 'none');
@@ -705,7 +706,7 @@ function closeUserModal() {
 }
 
 function confirmUser() {
-    const input    = document.getElementById('usernameInput');
+    const input = document.getElementById('usernameInput');
     const username = input.value.trim();
     if (!username) { input.classList.add('input-shake'); setTimeout(() => input.classList.remove('input-shake'), 400); return; }
     localStorage.setItem('codeViz:currentUser', username);
@@ -726,13 +727,13 @@ function saveCode() {
     const user = getCurrentUser();
     if (!user) { showUserModal(); return; }
 
-    const key   = `codeViz:${user}:saves`;
+    const key = `codeViz:${user}:saves`;
     const saves = JSON.parse(localStorage.getItem(key) || '[]');
 
     saves.unshift({
-        code:      editor.getValue(),
+        code: editor.getValue(),
         timestamp: Date.now(),
-        label:     new Date().toLocaleString()
+        label: new Date().toLocaleString()
     });
     if (saves.length > 15) saves.pop();          // keep newest 15
     localStorage.setItem(key, JSON.stringify(saves));
@@ -741,12 +742,12 @@ function saveCode() {
 
 /* ── Load ─────────────────────────────────────────────────── */
 function loadSaves() {
-    const user  = getCurrentUser();
+    const user = getCurrentUser();
     if (!user) { showUserModal(); return; }
 
-    const key   = `codeViz:${user}:saves`;
+    const key = `codeViz:${user}:saves`;
     const saves = JSON.parse(localStorage.getItem(key) || '[]');
-    const list  = document.getElementById('savesList');
+    const list = document.getElementById('savesList');
 
     if (!saves.length) {
         list.innerHTML = `<div class="empty-hint">No saves found for <strong>${escHtml(user)}</strong>.<br>Click <em>Save</em> after writing some code!</div>`;
@@ -773,7 +774,7 @@ function closeSavesModal() {
 }
 
 function loadSave(index) {
-    const user  = getCurrentUser();
+    const user = getCurrentUser();
     const saves = JSON.parse(localStorage.getItem(`codeViz:${user}:saves`) || '[]');
     if (!saves[index]) return;
     editor.setValue(saves[index].code);
@@ -784,7 +785,17 @@ function loadSave(index) {
 
 /* ═══════════════════════════════════════════════════════════
    REAL C++ COMPILER  (Wandbox — free, no key, CORS-safe)
+   CodeChef-level: real GCC 14, stdin support, execution stats
    ═══════════════════════════════════════════════════════════ */
+
+function toggleStdin() {
+    const area = document.getElementById('stdinArea');
+    const btn = document.getElementById('stdinToggleBtn');
+    const visible = area.style.display !== 'none';
+    area.style.display = visible ? 'none' : 'flex';
+    btn.classList.toggle('stdin-active', !visible);
+    if (!visible) document.getElementById('stdinInput').focus();
+}
 
 async function compileAndRun() {
     const btn = document.getElementById('compileBtn');
@@ -793,21 +804,26 @@ async function compileAndRun() {
 
     switchConsoleTab('compiler');
     const out = document.getElementById('compileOut');
-    out.innerHTML = '<div class="compile-loading"><i class="fa fa-spinner fa-spin"></i> Sending to GCC (Wandbox)…</div>';
+    out.innerHTML = '<div class="compile-loading"><i class="fa fa-spinner fa-spin"></i> Sending to GCC 14 (Wandbox)…</div>';
+
+    const stdinVal = (document.getElementById('stdinInput')?.value || '');
+    const startTime = performance.now();
 
     try {
         const res = await fetch('https://wandbox.org/api/compile.json', {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                compiler:              'gcc-head',
-                code:                  editor.getValue(),
-                options:               'warning,c++17',
-                'compiler-option-raw': '-std=c++17 -O2'
+                compiler: 'gcc-head',
+                code: editor.getValue(),
+                options: 'warning,c++17',
+                'compiler-option-raw': '-std=c++17\n-O2',
+                stdin: stdinVal
             })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
-        renderCompilerOutput(await res.json());
+        const elapsed = Math.round(performance.now() - startTime);
+        renderCompilerOutput(await res.json(), elapsed, stdinVal);
     } catch (e) {
         out.innerHTML = `<div class="err-item re"><i class="fa fa-circle-exclamation"></i>
             Compiler service error: ${escHtml(e.message)}</div>
@@ -818,10 +834,10 @@ async function compileAndRun() {
     }
 }
 
-function renderCompilerOutput(data) {
-    const out     = document.getElementById('compileOut');
+function renderCompilerOutput(data, elapsedMs, stdinUsed) {
+    const out = document.getElementById('compileOut');
     const success = String(data.status) === '0';
-    out.innerHTML  = '';
+    out.innerHTML = '';
 
     // Status banner
     const banner = document.createElement('div');
@@ -830,6 +846,33 @@ function renderCompilerOutput(data) {
         ? '<i class="fa fa-circle-check"></i> Compiled & ran successfully (exit 0)'
         : `<i class="fa fa-circle-xmark"></i> Exited with status ${escHtml(String(data.status))}`;
     out.appendChild(banner);
+
+    // Execution stats bar
+    if (elapsedMs !== undefined) {
+        const statsBar = document.createElement('div');
+        statsBar.className = 'compile-stats';
+        const rawVer = data.compiler_version ? String(data.compiler_version).split('\n')[0] : 'GCC (head)';
+        const gccVer = escHtml(rawVer.replace('gcc version ', ''));
+        statsBar.innerHTML =
+            '<div class="compile-stat"><i class="fa fa-clock"></i>&nbsp;<span>' + elapsedMs + ' ms</span>&nbsp;round-trip</div>' +
+            '<div class="compile-stat"><i class="fa fa-microchip"></i>&nbsp;<span>GCC ' + gccVer + '</span></div>' +
+            '<div class="compile-stat"><i class="fa fa-code"></i>&nbsp;<span>C++17 -O2</span></div>';
+        out.appendChild(statsBar);
+    }
+
+    // Stdin echo
+    if (stdinUsed && stdinUsed.trim()) {
+        const echoWrap = document.createElement('div');
+        const lbl = document.createElement('div');
+        lbl.className = 'stdin-echo-label';
+        lbl.innerHTML = '<i class="fa fa-keyboard"></i>&nbsp;stdin sent';
+        const echoBox = document.createElement('div');
+        echoBox.className = 'stdin-echo';
+        echoBox.textContent = stdinUsed;
+        echoWrap.appendChild(lbl);
+        echoWrap.appendChild(echoBox);
+        out.appendChild(echoWrap);
+    }
 
     // Compiler messages
     const compMsg = ((data.compiler_error || '') + (data.compiler_output || '')).trim();

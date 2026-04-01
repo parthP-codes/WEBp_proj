@@ -645,6 +645,7 @@ function reset() {
 
 function initVisualizer() {
     reset();
+    updateUserUI();
 
     // Re-compile on code change (debounced 800 ms)
     editor.onDidChangeModelContent(() => {
@@ -653,4 +654,252 @@ function initVisualizer() {
             if (!intervalId) reset();
         }, 800);
     });
+
+    // Enter key in username modal
+    document.getElementById('usernameInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') confirmUser();
+    });
+
+    // Close modals on backdrop click
+    document.getElementById('userModal').addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeUserModal();
+    });
+    document.getElementById('savesModal').addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeSavesModal();
+    });
+
+    // Switch to visualizer tab by default
+    switchConsoleTab('visualizer');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   USER & SAVE SYSTEM  (localStorage-based, keyed by username)
+   ═══════════════════════════════════════════════════════════ */
+
+function getCurrentUser() {
+    return localStorage.getItem('codeViz:currentUser') || '';
+}
+
+function updateUserUI() {
+    const user    = getCurrentUser();
+    const loginBtn = document.getElementById('loginBtn');
+    const userChip = document.getElementById('userChip');
+    const display  = document.getElementById('userNameDisplay');
+
+    if (user) {
+        loginBtn && (loginBtn.style.display = 'none');
+        userChip && (userChip.style.display = 'flex');
+        display  && (display.textContent    = user);
+    } else {
+        loginBtn && (loginBtn.style.display = 'flex');
+        userChip && (userChip.style.display = 'none');
+    }
+}
+
+function showUserModal() {
+    document.getElementById('userModal').classList.add('open');
+    setTimeout(() => document.getElementById('usernameInput').focus(), 80);
+}
+function closeUserModal() {
+    document.getElementById('userModal').classList.remove('open');
+}
+
+function confirmUser() {
+    const input    = document.getElementById('usernameInput');
+    const username = input.value.trim();
+    if (!username) { input.classList.add('input-shake'); setTimeout(() => input.classList.remove('input-shake'), 400); return; }
+    localStorage.setItem('codeViz:currentUser', username);
+    input.value = '';
+    closeUserModal();
+    updateUserUI();
+    showToast(`Welcome, ${username}!`, 'success');
+}
+
+function signOut() {
+    localStorage.removeItem('codeViz:currentUser');
+    updateUserUI();
+    showToast('Signed out', 'info');
+}
+
+/* ── Save ─────────────────────────────────────────────────── */
+function saveCode() {
+    const user = getCurrentUser();
+    if (!user) { showUserModal(); return; }
+
+    const key   = `codeViz:${user}:saves`;
+    const saves = JSON.parse(localStorage.getItem(key) || '[]');
+
+    saves.unshift({
+        code:      editor.getValue(),
+        timestamp: Date.now(),
+        label:     new Date().toLocaleString()
+    });
+    if (saves.length > 15) saves.pop();          // keep newest 15
+    localStorage.setItem(key, JSON.stringify(saves));
+    showToast('✓ Progress saved!', 'success');
+}
+
+/* ── Load ─────────────────────────────────────────────────── */
+function loadSaves() {
+    const user  = getCurrentUser();
+    if (!user) { showUserModal(); return; }
+
+    const key   = `codeViz:${user}:saves`;
+    const saves = JSON.parse(localStorage.getItem(key) || '[]');
+    const list  = document.getElementById('savesList');
+
+    if (!saves.length) {
+        list.innerHTML = `<div class="empty-hint">No saves found for <strong>${escHtml(user)}</strong>.<br>Click <em>Save</em> after writing some code!</div>`;
+    } else {
+        list.innerHTML = saves.map((s, i) => `
+          <div class="save-item">
+            <div class="save-meta">
+              <i class="fa fa-clock"></i>
+              <span class="save-label">${escHtml(s.label)}</span>
+            </div>
+            <pre class="save-preview">${escHtml(s.code.split('\n').slice(0, 4).join('\n'))}</pre>
+            <button class="ctrl-btn btn-load-item" onclick="loadSave(${i})">
+              <i class="fa fa-folder-open"></i> Load
+            </button>
+          </div>
+        `).join('');
+    }
+
+    document.getElementById('savesModal').classList.add('open');
+}
+
+function closeSavesModal() {
+    document.getElementById('savesModal').classList.remove('open');
+}
+
+function loadSave(index) {
+    const user  = getCurrentUser();
+    const saves = JSON.parse(localStorage.getItem(`codeViz:${user}:saves`) || '[]');
+    if (!saves[index]) return;
+    editor.setValue(saves[index].code);
+    reset();
+    closeSavesModal();
+    showToast('Code loaded!', 'success');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REAL C++ COMPILER  (Wandbox — free, no key, CORS-safe)
+   ═══════════════════════════════════════════════════════════ */
+
+async function compileAndRun() {
+    const btn = document.getElementById('compileBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i><span>Compiling…</span>';
+
+    switchConsoleTab('compiler');
+    const out = document.getElementById('compileOut');
+    out.innerHTML = '<div class="compile-loading"><i class="fa fa-spinner fa-spin"></i> Sending to GCC (Wandbox)…</div>';
+
+    try {
+        const res = await fetch('https://wandbox.org/api/compile.json', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                compiler:              'gcc-head',
+                code:                  editor.getValue(),
+                options:               'warning,c++17',
+                'compiler-option-raw': '-std=c++17 -O2'
+            })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+        renderCompilerOutput(await res.json());
+    } catch (e) {
+        out.innerHTML = `<div class="err-item re"><i class="fa fa-circle-exclamation"></i>
+            Compiler service error: ${escHtml(e.message)}</div>
+            <div class="compile-tip">Check your internet connection or try again shortly.</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-hammer"></i><span>Compile & Run</span>';
+    }
+}
+
+function renderCompilerOutput(data) {
+    const out     = document.getElementById('compileOut');
+    const success = String(data.status) === '0';
+    out.innerHTML  = '';
+
+    // Status banner
+    const banner = document.createElement('div');
+    banner.className = `compile-status ${success ? 'cs-ok' : 'cs-err'}`;
+    banner.innerHTML = success
+        ? '<i class="fa fa-circle-check"></i> Compiled & ran successfully (exit 0)'
+        : `<i class="fa fa-circle-xmark"></i> Exited with status ${escHtml(String(data.status))}`;
+    out.appendChild(banner);
+
+    // Compiler messages
+    const compMsg = ((data.compiler_error || '') + (data.compiler_output || '')).trim();
+    if (compMsg) {
+        out.appendChild(makeCompileSection(
+            '<i class="fa fa-triangle-exclamation"></i> Compiler Messages',
+            compMsg, 'compile-warn'
+        ));
+    }
+
+    // Program output
+    const progOut = ((data.program_output || '') + (data.program_error || '')).trim();
+    if (progOut) {
+        out.appendChild(makeCompileSection(
+            '<i class="fa fa-terminal"></i> Program Output',
+            progOut, 'compile-stdout'
+        ));
+    }
+
+    if (!compMsg && !progOut) {
+        out.innerHTML += '<div class="empty-hint">Program ran but produced no output.</div>';
+    }
+}
+
+function makeCompileSection(titleHTML, text, cls) {
+    const sec = document.createElement('div');
+    sec.className = 'compile-section';
+    const title = document.createElement('div');
+    title.className = 'compile-sec-title';
+    title.innerHTML = titleHTML;
+    const pre = document.createElement('pre');
+    pre.className = `compile-pre ${cls}`;
+    pre.textContent = text;
+    sec.appendChild(title);
+    sec.appendChild(pre);
+    return sec;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CONSOLE TABS
+   ═══════════════════════════════════════════════════════════ */
+
+function switchConsoleTab(tab) {
+    const vizTab = document.getElementById('tabViz');
+    const cmpTab = document.getElementById('tabCompiler');
+    const vizOut = document.getElementById('consoleOut');
+    const cmpOut = document.getElementById('compileOut');
+
+    const isViz = tab === 'visualizer';
+    vizTab && vizTab.classList.toggle('tab-active', isViz);
+    cmpTab && cmpTab.classList.toggle('tab-active', !isViz);
+    if (vizOut) vizOut.style.display = isViz ? '' : 'none';
+    if (cmpOut) cmpOut.style.display = isViz ? 'none' : '';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOAST NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    const icon = type === 'success' ? 'fa-circle-check' : 'fa-circle-info';
+    toast.innerHTML = `<i class="fa ${icon}"></i> ${escHtml(msg)}`;
+    container.appendChild(toast);
+    requestAnimationFrame(() => { requestAnimationFrame(() => toast.classList.add('toast-show')); });
+    setTimeout(() => {
+        toast.classList.remove('toast-show');
+        setTimeout(() => toast.remove(), 350);
+    }, 2800);
 }

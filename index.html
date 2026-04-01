@@ -23,9 +23,27 @@
       <div class="nav-center">
         <span class="nav-tag">C++ Visualizer</span>
       </div>
-      <div class="nav-links">
-        <span><i class="fa fa-book"></i> Docs</span>
-        <span><i class="fa fa-circle-question"></i> Help</span>
+      <div class="nav-right">
+        <div class="nav-links">
+          <span><i class="fa fa-book"></i> Docs</span>
+          <span><i class="fa fa-circle-question"></i> Help</span>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-user" id="navUser">
+          <button class="user-btn" id="loginBtn" onclick="showUserModal()">
+            <i class="fa fa-circle-user"></i> Sign In
+          </button>
+          <div class="user-chip" id="userChip" style="display:none">
+            <i class="fa fa-circle-user"></i>
+            <span id="userNameDisplay">User</span>
+            <div class="user-dropdown">
+              <div class="ud-item" onclick="saveCode()"><i class="fa fa-floppy-disk"></i> Save Progress</div>
+              <div class="ud-item" onclick="loadSaves()"><i class="fa fa-folder-open"></i> Load Saves</div>
+              <div class="ud-sep"></div>
+              <div class="ud-item ud-danger" onclick="signOut()"><i class="fa fa-right-from-bracket"></i> Sign Out</div>
+            </div>
+          </div>
+        </div>
       </div>
     </nav>
 
@@ -77,8 +95,13 @@
       <div class="panel p-console">
         <div class="panel-header">
           <span><i class="fa fa-rectangle-terminal"></i> Console Output</span>
+          <div class="tab-bar">
+            <button class="tab-btn tab-active" id="tabViz" onclick="switchConsoleTab('visualizer')">Visualizer</button>
+            <button class="tab-btn" id="tabCompiler" onclick="switchConsoleTab('compiler')">Compiler</button>
+          </div>
         </div>
         <div id="consoleOut"></div>
+        <div id="compileOut" style="display:none;flex:1;overflow-y:auto;padding:10px;"></div>
       </div>
 
       <!-- 5. Diagnostics -->
@@ -107,6 +130,22 @@
 
       <button class="ctrl-btn btn-reset" onclick="reset()" title="Reset">
         <i class="fa fa-rotate"></i><span>Reset</span>
+      </button>
+
+      <div class="ctrl-sep"></div>
+
+      <button class="ctrl-btn btn-compile" id="compileBtn" onclick="compileAndRun()" title="Compile & Run with GCC">
+        <i class="fa fa-hammer"></i><span>Compile &amp; Run</span>
+      </button>
+
+      <div class="ctrl-sep"></div>
+
+      <button class="ctrl-btn btn-save" onclick="saveCode()" title="Save progress">
+        <i class="fa fa-floppy-disk"></i><span>Save</span>
+      </button>
+
+      <button class="ctrl-btn btn-load" onclick="loadSaves()" title="Load saved code">
+        <i class="fa fa-folder-open"></i><span>Load</span>
       </button>
 
       <div class="speed-box">
@@ -158,8 +197,41 @@ int main() {
       });
     </script>
 
+    <!-- ── User Sign-In Modal ── -->
+    <div class="modal-overlay" id="userModal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <span><i class="fa fa-circle-user"></i> Sign In</span>
+          <button class="modal-close" onclick="closeUserModal()"><i class="fa fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Enter a username to save and restore your code snippets across sessions. No password needed.</p>
+          <input type="text" id="usernameInput" class="modal-input" placeholder="e.g. parth_dev" maxlength="30" autocomplete="off" spellcheck="false" />
+          <div class="modal-actions">
+            <button class="ctrl-btn btn-run" onclick="confirmUser()">
+              <i class="fa fa-right-to-bracket"></i><span>Continue</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Load Saves Modal ── -->
+    <div class="modal-overlay" id="savesModal">
+      <div class="modal-box modal-box-wide">
+        <div class="modal-header">
+          <span><i class="fa fa-floppy-disk"></i> Saved Snippets</span>
+          <button class="modal-close" onclick="closeSavesModal()"><i class="fa fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div id="savesList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Toast Container ── -->
+    <div id="toastContainer"></div>
+
     <script src="script.js"></script>
-
-
   </body>
 </html>

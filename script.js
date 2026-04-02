@@ -1,3 +1,7 @@
+import { ConvexHttpClient } from "convex/browser";
+
+const convex = new ConvexHttpClient(import.meta.env.VITE_CONVEX_URL || "");
+
 /* ============================================================
    CODE VISUALIZER PRO — ENHANCED ENGINE v2.0
    Supports: int, float, double, bool, char
@@ -723,50 +727,64 @@ function signOut() {
 }
 
 /* ── Save ─────────────────────────────────────────────────── */
-function saveCode() {
+async function saveCode() {
     const user = getCurrentUser();
     if (!user) { showUserModal(); return; }
 
-    const key = `codeViz:${user}:saves`;
-    const saves = JSON.parse(localStorage.getItem(key) || '[]');
+    const btn = document.querySelector('.btn-save');
+    if (btn) btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i><span>Saving</span>';
 
-    saves.unshift({
-        code: editor.getValue(),
-        timestamp: Date.now(),
-        label: new Date().toLocaleString()
-    });
-    if (saves.length > 15) saves.pop();          // keep newest 15
-    localStorage.setItem(key, JSON.stringify(saves));
-    showToast('✓ Progress saved!', 'success');
+    try {
+        await convex.mutation("saves:saveCode", {
+            user: user,
+            code: window.editor.getValue(),
+            label: new Date().toLocaleString(),
+            timestamp: Date.now()
+        });
+        showToast('✓ Progress saved to Cloud!', 'success');
+    } catch (e) {
+        console.error("Save error:", e);
+        showToast('Error saving to Cloud', 'error');
+    } finally {
+        if (btn) btn.innerHTML = '<i class="fa fa-floppy-disk"></i><span>Save</span>';
+    }
 }
 
 /* ── Load ─────────────────────────────────────────────────── */
-function loadSaves() {
+let __cloudSavesCache = []; // To easily reference loaded saves by index
+
+async function loadSaves() {
     const user = getCurrentUser();
     if (!user) { showUserModal(); return; }
 
-    const key = `codeViz:${user}:saves`;
-    const saves = JSON.parse(localStorage.getItem(key) || '[]');
     const list = document.getElementById('savesList');
-
-    if (!saves.length) {
-        list.innerHTML = `<div class="empty-hint">No saves found for <strong>${escHtml(user)}</strong>.<br>Click <em>Save</em> after writing some code!</div>`;
-    } else {
-        list.innerHTML = saves.map((s, i) => `
-          <div class="save-item">
-            <div class="save-meta">
-              <i class="fa fa-clock"></i>
-              <span class="save-label">${escHtml(s.label)}</span>
-            </div>
-            <pre class="save-preview">${escHtml(s.code.split('\n').slice(0, 4).join('\n'))}</pre>
-            <button class="ctrl-btn btn-load-item" onclick="loadSave(${i})">
-              <i class="fa fa-folder-open"></i> Load
-            </button>
-          </div>
-        `).join('');
-    }
-
+    list.innerHTML = `<div class="empty-hint"><i class="fa fa-spinner fa-spin"></i> Loading from Cloud...</div>`;
     document.getElementById('savesModal').classList.add('open');
+
+    try {
+        const saves = await convex.query("saves:listSaves", { user });
+        __cloudSavesCache = saves;
+
+        if (!saves.length) {
+            list.innerHTML = `<div class="empty-hint">No Cloud saves found for <strong>${escHtml(user)}</strong>.<br>Click <em>Save</em> after writing some code!</div>`;
+        } else {
+            list.innerHTML = saves.map((s, i) => `
+              <div class="save-item">
+                <div class="save-meta">
+                  <i class="fa fa-cloud"></i>
+                  <span class="save-label">${escHtml(s.label)}</span>
+                </div>
+                <pre class="save-preview">${escHtml(s.code.split('\\n').slice(0, 4).join('\\n'))}</pre>
+                <button class="ctrl-btn btn-load-item" onclick="loadSave(${i})">
+                  <i class="fa fa-folder-open"></i> Load
+                </button>
+              </div>
+            `).join('');
+        }
+    } catch (e) {
+        console.error("Load error:", e);
+        list.innerHTML = `<div class="empty-hint" style="color:var(--c-err)">Failed to load saves from Cloud.</div>`;
+    }
 }
 
 function closeSavesModal() {
@@ -774,13 +792,11 @@ function closeSavesModal() {
 }
 
 function loadSave(index) {
-    const user = getCurrentUser();
-    const saves = JSON.parse(localStorage.getItem(`codeViz:${user}:saves`) || '[]');
-    if (!saves[index]) return;
-    editor.setValue(saves[index].code);
+    if (!__cloudSavesCache[index]) return;
+    window.editor.setValue(__cloudSavesCache[index].code);
     reset();
     closeSavesModal();
-    showToast('Code loaded!', 'success');
+    showToast('Code loaded from Cloud!', 'success');
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -946,3 +962,25 @@ function showToast(msg, type = 'info') {
         setTimeout(() => toast.remove(), 350);
     }, 2800);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   EXPORT TO WINDOW (Since this is now a module)
+   ═══════════════════════════════════════════════════════════ */
+Object.assign(window, {
+    initVisualizer,
+    showUserModal,
+    closeUserModal,
+    confirmUser,
+    signOut,
+    saveCode,
+    loadSaves,
+    loadSave,
+    closeSavesModal,
+    step,
+    run,
+    pause,
+    reset,
+    compileAndRun,
+    toggleStdin,
+    switchConsoleTab
+});
